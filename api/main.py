@@ -167,6 +167,19 @@ def root():
 # sample query: 
 # http://127.0.0.1:8000/book-tour/?attendeeEmail="njayasee@ucsc.edu"&dateTime="2025-07-06XYZ"&tourId="tourtype"
 
+@app.options("/book-tour/")
+async def preflight_handler():
+    return JSONResponse(
+        content={"message": "ok"},
+        headers={
+            "Access-Control-Allow-Origin": origins[0],
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        }
+    )
+
+
+
 @app.post('/book-tour/')
 # async def create_event(attendeeEmail: str, dateTime: str, tourId: str):
 async def create_event(request: Request):
