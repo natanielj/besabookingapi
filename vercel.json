@@ -1,17 +1,14 @@
 {
   "version": 2,
   "functions": {
-    "index.py": {
-      "runtime": "python3.11",
+    "api/index.py": {
+      "runtime": "vercel-python@0.5.2",
       "maxDuration": 30,
       "memory": 1024,
       "includeFiles": "**/*"
     }
   },
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "index.py"
-    }
+    { "src": "/(.*)", "dest": "index.py" }
   ]
 }
