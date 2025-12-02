@@ -46,8 +46,8 @@ app = FastAPI()
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://besa-booking-git-backendv5-be-student-ambassadors-projects.vercel.app/", # preview environment deploy
-    "https://besa-booking.vercel.app/"
+    "https://besa-booking-git-backendv5-be-student-ambassadors-projects.vercel.app", # preview environment deploy
+    "https://besa-booking.vercel.app"
 ]
 
 app.add_middleware(
