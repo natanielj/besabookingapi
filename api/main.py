@@ -3,19 +3,19 @@ from datetime import datetime, timedelta
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+
 import firebase_admin
 from firebase_admin import credentials
-from firebase_admin import firestore  # For Firestore
+from firebase_admin import firestore
+
 from mangum import Mangum
 
 
 def load_firebase_credentials():
-    """
-    Build firebase service account credentials from environment variables.
-    Falls back to local JSON file for local development.
-    """
     private_key = os.getenv("FIREBASE_PRIVATE_KEY")
     service_account_type = os.getenv("FIREBASE_TYPE")
 
@@ -41,22 +41,27 @@ def load_firebase_credentials():
 firebase_cred = load_firebase_credentials()
 firebase_admin.initialize_app(firebase_cred)
 
+
+
 app = FastAPI()
 
-origins = ["*"
-    # "https://besa-booking-git-backendv5-be-student-ambassadors-projects.vercel.app", # preview environment deploy
-    # "https://besa-booking.vercel.app",
-    # "http://localhost:5173",
-    # "http://127.0.0.1:5173",
+FRONTEND = "https://besa-booking-git-backendv5-be-student-ambassadors-projects.vercel.app"
+
+origins = [
+    FRONTEND,
+    "http://localhost:5173",
+    "https://besa-booking.vercel.app",
+    "*"
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_methods=["*"],          # Must include OPTIONS
+    allow_headers=["*"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
 )
+
 
 DEFAULT_SCOPES = ['https://www.googleapis.com/auth/calendar']
 
@@ -69,10 +74,6 @@ def resolve_calendar_scopes():
 
 
 def load_google_calendar_credentials(scopes):
-    """
-    Build Google calendar credentials from env variables.
-    Falls back to token.json for local development.
-    """
     token = os.getenv("CALENDAR_TOKEN")
     refresh_token = os.getenv("CALENDAR_REFRESH_TOKEN")
     token_uri = os.getenv("CALENDAR_TOKEN_URI")
@@ -90,7 +91,6 @@ def load_google_calendar_credentials(scopes):
             "universe_domain": os.getenv("CALENDAR_UNIVERSE_DOMAIN"),
             "account": os.getenv("CALENDAR_ACCOUNT", ""),
         }
-
         expiry = os.getenv("CALENDAR_EXPIRY")
         if expiry:
             token_info["expiry"] = expiry
@@ -103,34 +103,30 @@ def load_google_calendar_credentials(scopes):
 SCOPES = resolve_calendar_scopes()
 creds = load_google_calendar_credentials(SCOPES)
 calendar_service = build("calendar", "v3", credentials=creds)
+
 db = firestore.client()
 
 handler = Mangum(app)
 
 
-def getEvents():
-    tours_ref = db.collection('Tours')
-    docs = tours_ref.stream()
-
 
 
 def createEvent(data):
     start_dt = datetime.strptime(
-        f"{data['date']} {data['time']}",
-        "%Y-%m-%d %I:%M %p"
+        f"{data['date']} {data['time']}", "%Y-%m-%d %I:%M %p"
     )
     end_dt = start_dt + timedelta(hours=1)
-    # print("Using service account:", creds.service_account_email)
-
 
     event = {
         "summary": data.get("tourType", "Event"),
-        "description": f"Tour ID: {data['tourId']}\n"
-                        f"Name: {data['firstName']} {data['lastName']}\n"
-                        f"Organization: {data['organization']}\n"
-                        f"Role: {data['role']}\n"
-                        f"Interests: {', '.join(data.get('interests', []))}\n"
-                        f"Notes: {data.get('notes', '')}",
+        "description": (
+            f"Tour ID: {data['tourId']}\n"
+            f"Name: {data['firstName']} {data['lastName']}\n"
+            f"Organization: {data['organization']}\n"
+            f"Role: {data['role']}\n"
+            f"Interests: {', '.join(data.get('interests', []))}\n"
+            f"Notes: {data.get('notes', '')}"
+        ),
         "start": {
             "dateTime": start_dt.isoformat(),
             "timeZone": "America/Los_Angeles",
@@ -154,39 +150,30 @@ def createEvent(data):
 
 
 
-# need to create functions that Create, Get, and Delete Events
 
-# sample
-@app.get('/')
+@app.get("/")
 def root():
     return {"Hello": "World"}
 
 
-# Create/Insert Event given a specific time, date, location, attendees, description, reminders?, 
-
-# sample query: 
-# http://127.0.0.1:8000/book-tour/?attendeeEmail="njayasee@ucsc.edu"&dateTime="2025-07-06XYZ"&tourId="tourtype"
-
 @app.options("/book-tour/")
-async def preflight_handler():
+async def book_tour_options():
     return JSONResponse(
-        content={"message": "ok"},
+        content={"message": "preflight ok"},
         headers={
-            "Access-Control-Allow-Origin": origins[0],
+            "Access-Control-Allow-Origin": FRONTEND,
             "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
         }
     )
 
 
-
-@app.post('/book-tour/')
-# async def create_event(attendeeEmail: str, dateTime: str, tourId: str):
-async def create_event(request: Request):
-
+@app.post("/book-tour/")
+async def book_tour(request: Request):
     data = await request.json()
     createEvent(data)
-    return {"message": "Tour created successfully!", "data": data}
+    return {"message": "Tour created successfully", "data": data}
+
 
 if __name__ == "__main__":
     import uvicorn
