@@ -30,15 +30,15 @@ dist-ssr
 
 .venv/
 .env
-api/credentials.json
+credentials.json
 
-api/token.json
-api/client_secret.json
+token.json
+client_secret.json
 
 # serviceAccountKey.json
 
 __pycache__/
 __pycache__/
 
-api/serviceAccountKey.json
+serviceAccountKey.json
 

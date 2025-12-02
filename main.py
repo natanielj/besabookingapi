@@ -9,10 +9,26 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
 import firebase_admin
-from firebase_admin import credentials
-from firebase_admin import firestore
+from firebase_admin import credentials, firestore
 
-from mangum import Mangum
+
+app = FastAPI()
+
+FRONTEND = "https://besa-booking-git-backendv5-be-student-ambassadors-projects.vercel.app"
+
+ALLOWED_ORIGINS = [
+    FRONTEND,
+    "https://besa-booking.vercel.app",
+    "http://localhost:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
 
 
 def load_firebase_credentials():
@@ -38,39 +54,15 @@ def load_firebase_credentials():
     return credentials.Certificate("./serviceAccountKey.json")
 
 
-firebase_cred = load_firebase_credentials()
-firebase_admin.initialize_app(firebase_cred)
+try:
+    firebase_cred = load_firebase_credentials()
+    firebase_admin.initialize_app(firebase_cred)
+    db = firestore.client()
+except Exception:
+    db = None
 
 
-
-app = FastAPI()
-
-FRONTEND = "https://besa-booking-git-backendv5-be-student-ambassadors-projects.vercel.app"
-
-origins = [
-    FRONTEND,
-    "http://localhost:5173",
-    "https://besa-booking.vercel.app",
-    "*"
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_methods=["*"],          # Must include OPTIONS
-    allow_headers=["*"],
-    allow_credentials=True,
-)
-
-
-DEFAULT_SCOPES = ['https://www.googleapis.com/auth/calendar']
-
-
-def resolve_calendar_scopes():
-    scopes_env = os.getenv("CALENDAR_SCOPES")
-    if scopes_env:
-        return [scope.strip() for scope in scopes_env.split(",") if scope.strip()]
-    return DEFAULT_SCOPES
+DEFAULT_SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
 def load_google_calendar_credentials(scopes):
@@ -94,24 +86,27 @@ def load_google_calendar_credentials(scopes):
         expiry = os.getenv("CALENDAR_EXPIRY")
         if expiry:
             token_info["expiry"] = expiry
-
         return Credentials.from_authorized_user_info(token_info, scopes)
 
-    return Credentials.from_authorized_user_file("token.json", scopes)
+    try:
+        return Credentials.from_authorized_user_file("token.json", scopes)
+    except Exception:
+        return None
 
 
-SCOPES = resolve_calendar_scopes()
-creds = load_google_calendar_credentials(SCOPES)
-calendar_service = build("calendar", "v3", credentials=creds, cache_discovery=False)
-
-db = firestore.client()
-
-handler = Mangum(app)
-
-
+try:
+    creds = load_google_calendar_credentials(DEFAULT_SCOPES)
+    calendar_service = build(
+        "calendar", "v3", credentials=creds, cache_discovery=False
+    )
+except Exception:
+    calendar_service = None
 
 
 def createEvent(data):
+    if not calendar_service:
+        return None
+
     start_dt = datetime.strptime(
         f"{data['date']} {data['time']}", "%Y-%m-%d %I:%M %p"
     )
@@ -135,20 +130,14 @@ def createEvent(data):
             "dateTime": end_dt.isoformat(),
             "timeZone": "America/Los_Angeles",
         },
-        "attendees": [
-            {"email": data["email"]}
-        ],
+        "attendees": [{"email": data["email"]}],
     }
 
-    created_event = calendar_service.events().insert(
+    return calendar_service.events().insert(
         calendarId="primary",
         body=event,
         sendUpdates="all"
     ).execute()
-
-    return created_event
-
-
 
 
 @app.get("/")
@@ -156,13 +145,13 @@ def root():
     return {"Hello": "World"}
 
 
-@app.options("/book-tour/")
-async def book_tour_options():
+@app.options("/{path:path}")
+async def global_options(path: str):
     return JSONResponse(
         content={"message": "preflight ok"},
         headers={
             "Access-Control-Allow-Origin": FRONTEND,
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
         }
     )
