@@ -2,7 +2,7 @@
   "version": 2,
   "functions": {
     "api/main.py": {
-      "runtime": "vercel-python@0.5.2",
+      "runtime": "python3.12",
       "maxDuration": 30,
       "memory": 1024,
       "includeFiles": "api/**/*"
