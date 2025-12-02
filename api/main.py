@@ -102,7 +102,7 @@ def load_google_calendar_credentials(scopes):
 
 SCOPES = resolve_calendar_scopes()
 creds = load_google_calendar_credentials(SCOPES)
-calendar_service = build("calendar", "v3", credentials=creds)
+calendar_service = build("calendar", "v3", credentials=creds, cache_discovery=False)
 
 db = firestore.client()
 
